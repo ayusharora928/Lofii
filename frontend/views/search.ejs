@@ -1,0 +1,26 @@
+<%- include('partials/header') %>
+
+<section class="search">
+  <h2>Search Music</h2>
+  <form action="/search" method="GET">
+    <input type="text" name="q" placeholder="Search for songs or artists..." value="<%= query || '' %>">
+    <button type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+  </form>
+
+  <div class="cards">
+    <% if(tracks && tracks.length > 0) { %>
+      <% tracks.forEach(track => { %>
+        <div class="card">
+          <img src="/images/<%= track.cover %>" alt="<%= track.title %>">
+          <h4><%= track.title %></h4>
+          <p><%= track.artist %></p>
+          <button class="play-btn" data-src="/songs/<%= track.file %>"><i class="fa-solid fa-play"></i></button>
+        </div>
+      <% }) %>
+    <% } else if(query) { %>
+      <p>No results found for "<%= query %>"</p>
+    <% } %>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

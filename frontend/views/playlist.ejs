@@ -1,0 +1,23 @@
+<%- include('partials/header') %>
+
+<main>
+  <section class="playlist">
+    <h2>Your Playlist</h2>
+    <ul>
+      <% playlist.forEach(song => { %>
+        <li>
+          <img src="/images/<%= song.cover %>" alt="<%= song.title %>">
+          <div class="song-info">
+            <h4><%= song.title %></h4>
+            <p><%= song.artist %></p>
+          </div>
+          <button class="play-btn" data-src="/songs/<%= song.file %>">
+            <i class="fa-solid fa-play"></i>
+          </button>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</main>
+
+<%- include('partials/footer') %>
