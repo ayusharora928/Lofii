@@ -1,50 +1,18 @@
-import { useEffect, useState } from "react";
-import { getTracks, getRandomTrack } from "./api";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { MusicCard } from "./components/MusicCard";
 import { Player } from "./components/Player";
 import { Button } from "./components/ui/button";
 import { ImageWithFallback } from "./components/figma/ImageWithFallback";
-import { featuredAlbums, recentlyPlayed } from "./data/sampleTracks"; // ✅ static data
-import { Track } from "./types/track"; // ✅ type import
+import { useTracks } from "./hooks/useTracks";
 
 export default function App() {
-  // --- State management ---
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [featured, setFeatured] = useState<Track[]>([]);
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Use custom hook for dynamic tracks
+  const { tracks, featured, currentTrack, loading, playRandomTrack, changeTrack } = useTracks();
 
-  // --- Fetch backend data ---
-  useEffect(() => {
-    const loadTracks = async () => {
-      try {
-        const data = await getTracks();
-        setTracks(data.slice(0, 4));
-        setFeatured(data.slice(0, 6));
-      } catch (err) {
-        console.error("❌ Failed to fetch tracks:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadTracks();
-  }, []);
-
-  // --- Play random track ---
-  const playRandomTrack = async () => {
-    try {
-      const track = await getRandomTrack();
-      setCurrentTrack(track);
-    } catch (err) {
-      console.error("❌ Failed to play random track:", err);
-    }
-  };
-
-  // --- Data fallbacks ---
-  const recent = tracks.length ? tracks : recentlyPlayed;
-  const albums = featured.length ? featured : featuredAlbums;
+  // Data fallbacks
+  const recent = tracks;
+  const albums = featured;
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
@@ -78,10 +46,10 @@ export default function App() {
           {/* Main Sections */}
           <div className="p-8 space-y-12 max-w-7xl mx-auto">
             {/* Recently Played */}
-            <Section title="Recently Played" items={recent} onSelect={setCurrentTrack} />
+            <Section title="Recently Played" items={recent} onSelect={changeTrack} />
 
             {/* Popular This Week */}
-            <Section title="Popular This Week" items={albums} onSelect={setCurrentTrack} />
+            <Section title="Popular This Week" items={albums} onSelect={changeTrack} />
 
             {/* Made For You */}
             <section>
@@ -90,21 +58,14 @@ export default function App() {
                 <Button variant="ghost">Show all</Button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {featuredAlbums.slice(0, 4).map((album, index) => (
+                {albums.slice(0, 4).map((album, index) => (
                   <MusicCard
                     key={index}
                     title={`Mix ${index + 1}`}
                     artist="Personalized for you"
-                    image={album.image}
+                    image={album.album_cover || album.image || ""}
                     type="playlist"
-                    onClick={() =>
-                      setCurrentTrack({
-                        title: `Mix ${index + 1}`,
-                        artist: "Personalized for you",
-                        url: album.url || "",
-                        album_cover: album.image,
-                      })
-                    }
+                    onClick={() => changeTrack(album)}
                   />
                 ))}
               </div>
@@ -114,7 +75,7 @@ export default function App() {
       </div>
 
       {/* Player */}
-      <Player track={currentTrack} playlist={recent} onTrackChange={setCurrentTrack} />
+      <Player track={currentTrack} playlist={recent} onTrackChange={changeTrack} />
     </div>
   );
 }
@@ -126,8 +87,8 @@ function Section({
   onSelect,
 }: {
   title: string;
-  items: Track[];
-  onSelect: (track: Track) => void;
+  items: any[];
+  onSelect: (track: any) => void;
 }) {
   return (
     <section>
@@ -141,7 +102,7 @@ function Section({
             key={index}
             title={item.title}
             artist={item.artist}
-            image={item.album_cover || item.image}
+            image={item.album_cover || item.image || ""}
             onClick={() => onSelect(item)}
           />
         ))}
@@ -149,4 +110,3 @@ function Section({
     </section>
   );
 }
-
