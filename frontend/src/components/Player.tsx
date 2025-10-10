@@ -14,29 +14,39 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
 
-  // Sync playback when track changes
+  // 🎧 Fallback if no URL present
+  const getAudioSrc = (t: Track) =>
+    t.url ||
+    "https://cdn.pixabay.com/download/audio/2022/03/15/audio_5baf0e7e10.mp3?filename=lofi-study-112191.mp3";
+
+  // 🔄 Sync playback when track changes
   useEffect(() => {
-    if (!audioRef.current || !track?.url) return;
-    audioRef.current.src = track.url;
+    if (!audioRef.current || !track) return;
+    const src = getAudioSrc(track);
+    audioRef.current.src = src;
     audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   }, [track]);
 
-  // Play/pause toggle
+  // ▶️ / ⏸️ Toggle play/pause
   const togglePlay = () => {
     if (!audioRef.current) return;
-    if (isPlaying) audioRef.current.pause();
-    else audioRef.current.play();
-    setIsPlaying(!isPlaying);
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
   };
 
-  // Volume control
+  // 🔊 Adjust volume
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVol = parseFloat(e.target.value);
     setVolume(newVol);
     if (audioRef.current) audioRef.current.volume = newVol;
   };
 
-  // Next / Previous track
+  // ⏭️ / ⏮️ Skip
   const playNext = () => {
     if (!playlist.length || !track) return;
     const index = playlist.findIndex((t) => t.title === track.title);
@@ -51,6 +61,9 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     onTrackChange?.(prev);
   };
 
+  // 🕒 Auto-play next track when one ends
+  const handleEnded = () => playNext();
+
   if (!track) {
     return (
       <div className="fixed bottom-0 left-0 right-0 bg-background/70 backdrop-blur-lg border-t border-border p-4 text-center text-muted-foreground">
@@ -63,9 +76,9 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     <div className="fixed bottom-0 left-0 right-0 bg-background/70 backdrop-blur-lg border-t border-border p-4 flex items-center justify-between">
       {/* Track Info */}
       <div className="flex items-center space-x-4">
-        {track.album_cover || track.image || track.cover ? (
+        {track.album_cover || track.image ? (
           <img
-            src={track.album_cover || track.image || track.cover}
+            src={track.album_cover || track.image}
             alt={track.title}
             className="w-12 h-12 rounded-md object-cover"
           />
@@ -105,7 +118,8 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
         />
       </div>
 
-      <audio ref={audioRef} />
+      {/* Audio element */}
+      <audio ref={audioRef} onEnded={handleEnded} />
     </div>
   );
 }
