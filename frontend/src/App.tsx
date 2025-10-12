@@ -5,14 +5,22 @@ import { Player } from "./components/Player";
 import { Button } from "./components/ui/button";
 import { ImageWithFallback } from "./components/figma/ImageWithFallback";
 import { useTracks } from "./hooks/useTracks";
+import { featuredAlbums, recentlyPlayed } from "./data/tracksData";
+import { Track } from "./types/track";
 
 export default function App() {
   // Use custom hook for dynamic tracks
-  const { tracks, featured, currentTrack, loading, playRandomTrack, changeTrack } = useTracks();
+  const {
+    tracks,
+    currentTrack,
+    loading,
+    playRandomTrack,
+    changeTrack,
+  } = useTracks();
 
-  // Data fallbacks
-  const recent = tracks;
-  const albums = featured;
+  // Combine dynamic + static data
+  const recent: Track[] = tracks.length ? tracks : recentlyPlayed;
+  const albums: Track[] = featuredAlbums;
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
@@ -63,7 +71,7 @@ export default function App() {
                     key={index}
                     title={`Mix ${index + 1}`}
                     artist="Personalized for you"
-                    image={album.album_cover || album.image || ""}
+                    image={album.cover || album.image || ""}
                     type="playlist"
                     onClick={() => changeTrack(album)}
                   />
@@ -87,8 +95,8 @@ function Section({
   onSelect,
 }: {
   title: string;
-  items: any[];
-  onSelect: (track: any) => void;
+  items: Track[];
+  onSelect: (track: Track) => void;
 }) {
   return (
     <section>
@@ -97,12 +105,12 @@ function Section({
         <Button variant="ghost">Show all</Button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <MusicCard
-            key={index}
+            key={item.id}
             title={item.title}
             artist={item.artist}
-            image={item.album_cover || item.image || ""}
+            image={item.cover || item.image || ""}
             onClick={() => onSelect(item)}
           />
         ))}

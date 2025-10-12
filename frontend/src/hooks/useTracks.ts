@@ -1,52 +1,52 @@
+// src/hooks/useTracks.ts
 import { useEffect, useState } from "react";
-import { getTracks, getRandomTrack } from "../api"; // your API calls
+import { getTracks, getRandomTrack } from "../api";
 import { Track } from "../types/track";
+import { featuredAlbums, recentlyPlayed } from "../data/tracksData";
 
-interface UseTracksReturn {
-  tracks: Track[];
-  featured: Track[];
-  currentTrack: Track | null;
-  loading: boolean;
-  playRandomTrack: () => void;
-  changeTrack: (track: Track) => void;
-}
-
-export function useTracks(): UseTracksReturn {
+export function useTracks() {
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [featured, setFeatured] = useState<Track[]>([]);
+  const [featured, setFeatured] = useState<Track[]>(featuredAlbums);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Fetch tracks from backend
+  // 🧠 Fetch tracks when component mounts
   useEffect(() => {
-    const loadTracks = async () => {
+    async function fetchData() {
       try {
-        const data = await getTracks();
-        setTracks(data.slice(0, 4));       // Recently played
-        setFeatured(data.slice(0, 6));     // Featured / Popular
-      } catch (err) {
-        console.error("❌ Failed to fetch tracks:", err);
+        setLoading(true);
+        const fetched = await getTracks();
+
+        // Fallback: if API returns nothing, use static data
+        if (fetched && fetched.length > 0) {
+          setTracks(fetched);
+        } else {
+          setTracks(recentlyPlayed);
+        }
+
+        // Start with a random track
+        const random = getRandomTrack(fetched?.length ? fetched : recentlyPlayed);
+        setCurrentTrack(random);
+      } catch (error) {
+        console.error("Error fetching tracks:", error);
+        setTracks(recentlyPlayed);
       } finally {
         setLoading(false);
       }
-    };
-    loadTracks();
+    }
+
+    fetchData();
   }, []);
 
-  // Play a random track
-  const playRandomTrack = async () => {
-    try {
-      const track = await getRandomTrack();
-      setCurrentTrack(track);
-    } catch (err) {
-      console.error("❌ Failed to play random track:", err);
-    }
+  // 🎵 Play a random track from available tracks
+  const playRandomTrack = () => {
+    if (tracks.length === 0) return;
+    const random = getRandomTrack(tracks);
+    setCurrentTrack(random);
   };
 
-  // Change current track
-  const changeTrack = (track: Track) => {
-    setCurrentTrack(track);
-  };
+  // 🔁 Change current track manually
+  const changeTrack = (track: Track) => setCurrentTrack(track);
 
   return {
     tracks,
