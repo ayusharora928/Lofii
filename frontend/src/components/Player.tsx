@@ -8,9 +8,11 @@ import {
   Repeat,
   Shuffle,
   ChevronUp,
+  ListMusic,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Track } from "../types/track";
 
 interface PlayerProps {
@@ -29,25 +31,23 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
   const [isShuffle, setIsShuffle] = useState(false);
   const [isMini, setIsMini] = useState(false);
 
-  // 🧠 Toggle mini mode based on screen width
+  // 📱 Auto toggle mini-player for mobile
   useEffect(() => {
-    const handleResize = () => {
-      setIsMini(window.innerWidth < 768); // mobile breakpoint
-    };
+    const handleResize = () => setIsMini(window.innerWidth < 768);
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 🎵 Load and play new track
+  // 🎵 Handle new track loading and play
   useEffect(() => {
     if (!track || !audioRef.current) return;
     const audio = audioRef.current;
-    audio.src = track.url;
+    audio.src = track.url || "";
     audio.load();
     setProgress(0);
 
-    const playOnLoad = async () => {
+    const playTrack = async () => {
       try {
         await audio.play();
         setIsPlaying(true);
@@ -55,7 +55,7 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
         setIsPlaying(false);
       }
     };
-    playOnLoad();
+    playTrack();
   }, [track]);
 
   // 🕒 Update progress + handle repeat
@@ -79,7 +79,6 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
 
     audio.addEventListener("timeupdate", updateProgress);
     audio.addEventListener("ended", handleEnded);
-
     return () => {
       audio.removeEventListener("timeupdate", updateProgress);
       audio.removeEventListener("ended", handleEnded);
@@ -99,16 +98,18 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     }
   };
 
-  // ⏩ Skip
+  // ⏩ / ⏪ Skip track
   const skipTrack = (direction: "next" | "prev") => {
-    if (!playlist || playlist.length === 0 || !track) return;
+    if (!playlist.length || !track) return;
     let nextTrack: Track | null = null;
 
     if (isShuffle) {
       const randomIndex = Math.floor(Math.random() * playlist.length);
       nextTrack = playlist[randomIndex];
     } else {
-      const index = playlist.findIndex((t) => t.id === track.id);
+      const index = playlist.findIndex(
+        (t) => t.title === track.title || t.id === track.id
+      );
       if (index === -1) return;
       const nextIndex =
         direction === "next"
@@ -120,6 +121,7 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     onTrackChange?.(nextTrack);
   };
 
+  // 🎚️ Seek & Volume
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -143,13 +145,19 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     return `${minutes}:${seconds}`;
   };
 
-  if (!track) return null;
+  if (!track) {
+    return (
+      <div className="fixed bottom-0 left-0 right-0 bg-background/70 backdrop-blur-lg border-t border-border p-4 text-center text-muted-foreground">
+        Select a track to start playing 🎶
+      </div>
+    );
+  }
 
   return (
     <>
       <audio ref={audioRef} />
 
-      {/* 💡 MINI PLAYER (mobile view) */}
+      {/* 🎧 MINI PLAYER */}
       <AnimatePresence>
         {isMini && (
           <motion.div
@@ -159,27 +167,50 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
             exit={{ y: 80, opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border p-3 flex items-center justify-between cursor-pointer z-50"
-            onClick={() => setIsMini(false)} // expand on click
+            onClick={() => setIsMini(false)}
           >
             <div className="flex items-center space-x-3 overflow-hidden">
               <img
-                src={track.cover || track.image || ""}
+                src={track.album_cover || track.image || ""}
                 alt={track.title}
                 className="w-10 h-10 rounded-md object-cover"
               />
               <div>
                 <p className="text-sm font-medium truncate">{track.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {track.artist}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); skipTrack("prev"); }}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  skipTrack("prev");
+                }}
+              >
                 <SkipBack size={16} />
               </Button>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlay();
+                }}
+              >
                 {isPlaying ? <Pause size={18} /> : <Play size={18} />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); skipTrack("next"); }}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  skipTrack("next");
+                }}
+              >
                 <SkipForward size={16} />
               </Button>
             </div>
@@ -187,7 +218,7 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
         )}
       </AnimatePresence>
 
-      {/* 🎧 FULL PLAYER (desktop or expanded) */}
+      {/* 💻 FULL PLAYER */}
       {!isMini && (
         <motion.div
           key="full"
@@ -197,9 +228,10 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
           transition={{ duration: 0.3 }}
           className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border p-4 flex items-center justify-between z-50"
         >
+          {/* Track Info */}
           <div className="flex items-center space-x-4">
             <img
-              src={track.cover || track.image || ""}
+              src={track.album_cover || track.image || ""}
               alt={track.title}
               className="w-14 h-14 rounded-lg object-cover"
             />
@@ -209,6 +241,7 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
             </div>
           </div>
 
+          {/* Controls */}
           <div className="flex flex-col items-center w-1/3">
             <div className="flex items-center space-x-5 mb-2">
               <Button
@@ -218,13 +251,21 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
               >
                 <Shuffle size={18} />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => skipTrack("prev")}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => skipTrack("prev")}
+              >
                 <SkipBack size={20} />
               </Button>
               <Button variant="ghost" size="icon" onClick={togglePlay}>
                 {isPlaying ? <Pause size={24} /> : <Play size={24} />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => skipTrack("next")}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => skipTrack("next")}
+              >
                 <SkipForward size={20} />
               </Button>
               <Button
@@ -238,34 +279,94 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
 
             <div className="flex items-center w-full space-x-2">
               <span className="text-xs text-muted-foreground">{formatTime(progress)}</span>
+              <div
+                className="relative flex-1 h-1 bg-gray-700 rounded-lg cursor-pointer"
+                onClick={(e) => {
+                  const rect = (e.target as HTMLDivElement).getBoundingClientRect();
+                  const clickX = e.clientX - rect.left;
+                  const newTime = (clickX / rect.width) * duration;
+                  if (audioRef.current) audioRef.current.currentTime = newTime;
+                  setProgress(newTime);
+                }}
+              >
+                <motion.div
+                  className="absolute top-0 left-0 h-1 bg-primary rounded-lg"
+                  style={{ width: `${(progress / duration) * 100}%` }}
+                  transition={{ ease: "linear", duration: 0.1 }}
+                />
+              </div>
+              <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
+            </div>
+
+          </div>
+
+          {/* Volume + Queue + Minimize */}
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 w-32">
+              <Volume2 size={20} />
               <input
                 type="range"
                 min="0"
-                max={duration || 0}
-                value={progress}
-                onChange={handleSeek}
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={handleVolume}
                 className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary"
               />
-              <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
             </div>
-          </div>
 
-          <div className="flex items-center space-x-2 w-32">
-            <Volume2 size={20} />
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={volume}
-              onChange={handleVolume}
-              className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary"
-            />
-          </div>
+            {/* 🎶 Queue Dialog */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" title="View Queue">
+                  <ListMusic size={20} />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-background/80 backdrop-blur-md border border-border rounded-2xl p-4 max-w-md">
+                <h3 className="text-lg font-semibold mb-3">🎧 Queue</h3>
 
-          <Button variant="ghost" size="icon" onClick={() => setIsMini(true)} title="Minimize">
-            <ChevronUp size={20} />
-          </Button>
+                {playlist.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No tracks in queue
+                  </p>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {playlist.map((t, i) => (
+                      <div
+                        key={t.title + i}
+                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${t.title === track?.title
+                            ? "bg-primary/10"
+                            : "hover:bg-muted"
+                          }`}
+                        onClick={() => onTrackChange?.(t)}
+                      >
+                        <img
+                          src={t.album_cover || t.image || ""}
+                          alt={t.title}
+                          className="w-10 h-10 rounded-md object-cover"
+                        />
+                        <div>
+                          <p className="text-sm font-medium">{t.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {t.artist}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMini(true)}
+              title="Minimize"
+            >
+              <ChevronUp size={20} />
+            </Button>
+          </div>
         </motion.div>
       )}
     </>
