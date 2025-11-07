@@ -1,3 +1,4 @@
+// src/components/Player.tsx
 import { useEffect, useRef, useState } from "react";
 import {
   Play,
@@ -31,7 +32,44 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
   const [isShuffle, setIsShuffle] = useState(false);
   const [isMini, setIsMini] = useState(false);
 
-  // 📱 Auto toggle mini-player for mobile
+  /* -------------------------------------------------------------------------- */
+  /* ✅ Persistent Track + Progress (LocalStorage Resume)                      */
+  /* -------------------------------------------------------------------------- */
+
+  // Load saved track if app opens with null
+  useEffect(() => {
+    const savedTrack = localStorage.getItem("lofichill-current-track");
+    if (savedTrack && !track && onTrackChange) {
+      onTrackChange(JSON.parse(savedTrack));
+    }
+  }, []);
+
+  // Save track whenever changed
+  useEffect(() => {
+    if (track) {
+      localStorage.setItem("lofichill-current-track", JSON.stringify(track));
+    }
+  }, [track]);
+
+  // Save progress every second
+  useEffect(() => {
+    if (progress > 0) {
+      localStorage.setItem("lofichill-progress", progress.toString());
+    }
+  }, [progress]);
+
+  // When duration is available (track loaded), restore saved progress
+  useEffect(() => {
+    const savedProgress = localStorage.getItem("lofichill-progress");
+    if (audioRef.current && savedProgress && duration > 5) {
+      audioRef.current.currentTime = parseFloat(savedProgress);
+    }
+  }, [duration]);
+
+  /* -------------------------------------------------------------------------- */
+  /* 🎧 Mini-player breakpoint                                                  */
+  /* -------------------------------------------------------------------------- */
+
   useEffect(() => {
     const handleResize = () => setIsMini(window.innerWidth < 768);
     handleResize();
@@ -39,7 +77,10 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 🎵 Handle new track loading and play
+  /* -------------------------------------------------------------------------- */
+  /* 🎵 Handle new track loading and play                                       */
+  /* -------------------------------------------------------------------------- */
+
   useEffect(() => {
     if (!track || !audioRef.current) return;
     const audio = audioRef.current;
@@ -58,7 +99,10 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     playTrack();
   }, [track]);
 
-  // 🕒 Update progress + handle repeat
+  /* -------------------------------------------------------------------------- */
+  /* 🕒 Update progress + handle repeat                                         */
+  /* -------------------------------------------------------------------------- */
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -85,7 +129,10 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     };
   }, [isRepeat, isShuffle, track]);
 
-  // ▶️ / ⏸️ Toggle play
+  /* -------------------------------------------------------------------------- */
+  /* ▶️ / ⏸️ Play Toggle                                                        */
+  /* -------------------------------------------------------------------------- */
+
   const togglePlay = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -98,37 +145,36 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
     }
   };
 
-  // ⏩ / ⏪ Skip track
+  /* -------------------------------------------------------------------------- */
+  /* ⏪ / ⏩ Skip track                                                          */
+  /* -------------------------------------------------------------------------- */
+
   const skipTrack = (direction: "next" | "prev") => {
     if (!playlist.length || !track) return;
     let nextTrack: Track | null = null;
 
     if (isShuffle) {
-      const randomIndex = Math.floor(Math.random() * playlist.length);
-      nextTrack = playlist[randomIndex];
+      nextTrack = playlist[Math.floor(Math.random() * playlist.length)];
     } else {
       const index = playlist.findIndex(
         (t) => t.title === track.title || t.id === track.id
       );
       if (index === -1) return;
+
       const nextIndex =
         direction === "next"
           ? (index + 1) % playlist.length
           : (index - 1 + playlist.length) % playlist.length;
+
       nextTrack = playlist[nextIndex];
     }
 
     onTrackChange?.(nextTrack);
   };
 
-  // 🎚️ Seek & Volume
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const value = parseFloat(e.target.value);
-    audio.currentTime = value;
-    setProgress(value);
-  };
+  /* -------------------------------------------------------------------------- */
+  /* 🎚️ Seek / Progress / Volume                                               */
+  /* -------------------------------------------------------------------------- */
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
@@ -139,11 +185,45 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
   const formatTime = (time: number) => {
     if (isNaN(time)) return "0:00";
     const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60)
-      .toString()
-      .padStart(2, "0");
+    const seconds = Math.floor(time % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   };
+
+  /* -------------------------------------------------------------------------- */
+  /* 🎹 Keyboard Shortcuts                                                     */
+  /* -------------------------------------------------------------------------- */
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!track) return;
+
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "ArrowRight":
+          if (audioRef.current) audioRef.current.currentTime += 5;
+          break;
+        case "ArrowLeft":
+          if (audioRef.current) audioRef.current.currentTime -= 5;
+          break;
+        case "n":
+        case "N":
+          skipTrack("next");
+          break;
+        case "p":
+        case "P":
+          skipTrack("prev");
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [track, isPlaying]);
+
+  /* -------------------------------------------------------------------------- */
 
   if (!track) {
     return (
@@ -177,40 +257,18 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
               />
               <div>
                 <p className="text-sm font-medium truncate">{track.title}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {track.artist}
-                </p>
+                <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
               </div>
             </div>
+
             <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  skipTrack("prev");
-                }}
-              >
+              <Button variant="ghost" size="icon">
                 <SkipBack size={16} />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePlay();
-                }}
-              >
+              <Button variant="ghost" size="icon" onClick={togglePlay}>
                 {isPlaying ? <Pause size={18} /> : <Play size={18} />}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  skipTrack("next");
-                }}
-              >
+              <Button variant="ghost" size="icon">
                 <SkipForward size={16} />
               </Button>
             </div>
@@ -230,10 +288,13 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
         >
           {/* Track Info */}
           <div className="flex items-center space-x-4">
-            <img
+            {/* ✅ Rotating Album Art */}
+            <motion.img
               src={track.album_cover || track.image || ""}
               alt={track.title}
               className="w-14 h-14 rounded-lg object-cover"
+              animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+              transition={{ repeat: isPlaying ? Infinity : 0, duration: 6, ease: "linear" }}
             />
             <div>
               <p className="text-base font-medium">{track.title}</p>
@@ -244,43 +305,33 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
           {/* Controls */}
           <div className="flex flex-col items-center w-1/3">
             <div className="flex items-center space-x-5 mb-2">
-              <Button
-                variant={isShuffle ? "default" : "ghost"}
-                size="icon"
-                onClick={() => setIsShuffle(!isShuffle)}
-              >
+              <Button variant={isShuffle ? "default" : "ghost"} size="icon" onClick={() => setIsShuffle(!isShuffle)}>
                 <Shuffle size={18} />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => skipTrack("prev")}
-              >
+
+              <Button variant="ghost" size="icon" onClick={() => skipTrack("prev")}>
                 <SkipBack size={20} />
               </Button>
+
               <Button variant="ghost" size="icon" onClick={togglePlay}>
                 {isPlaying ? <Pause size={24} /> : <Play size={24} />}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => skipTrack("next")}
-              >
+
+              <Button variant="ghost" size="icon" onClick={() => skipTrack("next")}>
                 <SkipForward size={20} />
               </Button>
-              <Button
-                variant={isRepeat ? "default" : "ghost"}
-                size="icon"
-                onClick={() => setIsRepeat(!isRepeat)}
-              >
+
+              <Button variant={isRepeat ? "default" : "ghost"} size="icon" onClick={() => setIsRepeat(!isRepeat)}>
                 <Repeat size={18} />
               </Button>
             </div>
 
+            {/* ✅ Draggable Seek Bar */}
             <div className="flex items-center w-full space-x-2">
               <span className="text-xs text-muted-foreground">{formatTime(progress)}</span>
+
               <div
-                className="relative flex-1 h-1 bg-gray-700 rounded-lg cursor-pointer"
+                className="relative flex-1 h-1 bg-gray-700 rounded-lg cursor-pointer group"
                 onClick={(e) => {
                   const rect = (e.target as HTMLDivElement).getBoundingClientRect();
                   const clickX = e.clientX - rect.left;
@@ -294,28 +345,44 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
                   style={{ width: `${(progress / duration) * 100}%` }}
                   transition={{ ease: "linear", duration: 0.1 }}
                 />
+
+                <motion.div
+                  drag="x"
+                  dragConstraints={{ left: 0, right: duration }}
+                  onDrag={(e, info) => {
+                    const rect = (e.target as HTMLDivElement).parentElement!.getBoundingClientRect();
+                    const newTime = ((info.point.x - rect.left) / rect.width) * duration;
+                    if (audioRef.current) audioRef.current.currentTime = newTime;
+                    setProgress(newTime);
+                  }}
+                  className="absolute -top-1 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition"
+                  style={{
+                    left: `calc(${(progress / duration) * 100}% - 6px)`,
+                  }}
+                />
               </div>
+
               <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
             </div>
-
           </div>
 
           {/* Volume + Queue + Minimize */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 w-32">
-              <Volume2 size={20} />
-              <input
+            {/* ✅ Animated Volume Slider */}
+            <div className="flex items-center space-x-2 group">
+              <Volume2 size={20} className="text-muted-foreground" />
+              <motion.input
                 type="range"
                 min="0"
                 max="1"
                 step="0.01"
                 value={volume}
                 onChange={handleVolume}
-                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                className="w-0 group-hover:w-32 transition-all duration-300 h-1 bg-gray-700 rounded-lg cursor-pointer accent-primary"
               />
             </div>
 
-            {/* 🎶 Queue Dialog */}
+            {/* Queue Modal */}
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" title="View Queue">
@@ -326,18 +393,15 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
                 <h3 className="text-lg font-semibold mb-3">🎧 Queue</h3>
 
                 {playlist.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    No tracks in queue
-                  </p>
+                  <p className="text-muted-foreground text-sm">No tracks in queue</p>
                 ) : (
                   <div className="max-h-64 overflow-y-auto space-y-2">
                     {playlist.map((t, i) => (
                       <div
                         key={t.title + i}
-                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${t.title === track?.title
-                            ? "bg-primary/10"
-                            : "hover:bg-muted"
-                          }`}
+                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${
+                          t.title === track?.title ? "bg-primary/10" : "hover:bg-muted"
+                        }`}
                         onClick={() => onTrackChange?.(t)}
                       >
                         <img
@@ -347,9 +411,7 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
                         />
                         <div>
                           <p className="text-sm font-medium">{t.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {t.artist}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{t.artist}</p>
                         </div>
                       </div>
                     ))}
@@ -358,12 +420,7 @@ export function Player({ track, playlist = [], onTrackChange }: PlayerProps) {
               </DialogContent>
             </Dialog>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMini(true)}
-              title="Minimize"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setIsMini(true)} title="Minimize">
               <ChevronUp size={20} />
             </Button>
           </div>
