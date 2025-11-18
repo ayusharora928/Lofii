@@ -1,59 +1,117 @@
 // src/hooks/useTracks.ts
 import { useEffect, useState } from "react";
-import { getTracks, getRandomTrack } from "../api";
 import { Track } from "../types/track";
-import { featuredAlbums, recentlyPlayed } from "../data/tracksData";
+
+const API = "http://127.0.0.1:8000"; // local FastAPI backend
 
 export function useTracks() {
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [featured, setFeatured] = useState<Track[]>(featuredAlbums);
+  const [tracks, setTracks] = useState<Track[]>([]);          // search results
+  const [trending, setTrending] = useState<Track[]>([]);      // backend trending
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
 
-  // 🧠 Fetch tracks when component mounts
+  /* -----------------------------------------------------------
+     🔥 Load Trending Songs on Homepage (Auto load)
+  ----------------------------------------------------------- */
   useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const fetched = await getTracks();
-
-        // Fallback: if API returns nothing, use static data
-        if (fetched && fetched.length > 0) {
-          setTracks(fetched);
-        } else {
-          setTracks(recentlyPlayed);
-        }
-
-        // Start with a random track
-        const random = getRandomTrack(fetched?.length ? fetched : recentlyPlayed);
-        setCurrentTrack(random);
-      } catch (error) {
-        console.error("Error fetching tracks:", error);
-        setTracks(recentlyPlayed);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
+    fetchTrending();
   }, []);
 
-  // 🎵 Play a random track from available tracks
-  const playRandomTrack = () => {
-    if (tracks.length === 0) return;
-    const random = getRandomTrack(tracks);
-    setCurrentTrack(random);
-  };
+  async function fetchTrending() {
+    try {
+      const res = await fetch(`${API}/search?q=lofi`);
+      const data = await res.json();
 
-  // 🔁 Change current track manually
-  const changeTrack = (track: Track) => setCurrentTrack(track);
+      const items: Track[] = data.map((v: any) => ({
+        id: v.id,
+        title: v.title || "Unknown Track",
+        artist: v.artist || "Unknown Artist",
+        image: v.thumbnail,
+        url: "",
+      }));
+
+      setTrending(items);
+    } catch (e) {
+      console.warn("Trending fetch failed:", e);
+      setTrending([]);
+    }
+  }
+
+  /* -----------------------------------------------------------
+     🔍 Search Songs (YouTube Search)
+  ----------------------------------------------------------- */
+  async function searchTracks(query: string) {
+    if (!query) return [];
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      const results: Track[] = data.map((v: any) => ({
+        id: v.id,
+        title: v.title || "Unknown Track",
+        artist: v.artist || "Unknown Artist",
+        image: v.thumbnail,
+        url: "",
+      }));
+
+      setTracks(results);
+      return results;
+    } catch (e) {
+      console.error("Search failed:", e);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* -----------------------------------------------------------
+     🎵 PLAY SONG (fetch stream URL)
+  ----------------------------------------------------------- */
+  async function changeTrack(track: Track) {
+    if (!track.id) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/stream/${track.id}`);
+      const data = await res.json();
+
+      const playable: Track = {
+        ...track,
+        url: data.url,                      // actual audio stream
+        title: data.title || track.title,
+        artist: data.artist || track.artist,
+        image: data.thumbnail || track.image,
+      };
+
+      setCurrentTrack(playable);
+    } catch (e) {
+      console.error("Could not load stream:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* -----------------------------------------------------------
+     🔀 PLAY RANDOM (search or trending)
+  ----------------------------------------------------------- */
+  async function playRandomTrack() {
+    const list = tracks.length ? tracks : trending;
+    if (!list.length) return;
+
+    const random = list[Math.floor(Math.random() * list.length)];
+    await changeTrack(random);
+  }
 
   return {
-    tracks,
-    featured,
+    tracks,          // search results
+    trending,        // homepage trending
     currentTrack,
     loading,
-    playRandomTrack,
+
+    searchTracks,
     changeTrack,
+    playRandomTrack,
   };
 }

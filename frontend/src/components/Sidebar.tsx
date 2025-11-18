@@ -1,4 +1,11 @@
-import { Home, Search, Library, Plus, Heart, Music } from "lucide-react";
+import {
+  Home,
+  Search,
+  Library,
+  Plus,
+  Heart,
+  Music,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -22,26 +29,34 @@ export function Sidebar() {
   ];
 
   return (
-    <div className="w-64 bg-background border-r h-full flex flex-col">
+    <div className="w-64 flex-shrink-0 bg-background border-r h-full flex flex-col">
+      {/* MAIN NAV */}
       <div className="p-6">
-        <nav className="space-y-2">
-          {menuItems.map((item) => (
-            <Button
-              key={item.label}
-              variant={location.pathname === item.path ? "secondary" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => navigate(item.path)}
-            >
-              <item.icon className="mr-3 h-5 w-5" />
-              {item.label}
-            </Button>
-          ))}
+        <nav className="space-y-1">
+          {menuItems.map((item) => {
+            const active = location.pathname === item.path;
+
+            return (
+              <Button
+                key={item.label}
+                variant={active ? "secondary" : "ghost"}
+                className={`w-full justify-start transition-all ${
+                  active ? "bg-accent text-accent-foreground" : "hover:bg-accent/40"
+                }`}
+                onClick={() => navigate(item.path)}
+              >
+                <item.icon className="mr-3 h-5 w-5" />
+                {item.label}
+              </Button>
+            );
+          })}
         </nav>
       </div>
 
       <Separator />
 
-      <div className="p-6 flex-1">
+      {/* PLAYLISTS SECTION */}
+      <div className="p-6 flex-1 overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-medium">Playlists</h3>
           <Button variant="ghost" size="icon">
@@ -50,10 +65,10 @@ export function Sidebar() {
         </div>
 
         <nav className="space-y-1">
-          {/* ✅ Liked Songs — goes to /liked */}
+          {/* Liked Songs */}
           <Button
             variant={location.pathname === "/liked" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            className="w-full justify-start transition-all hover:bg-accent/40"
             onClick={() => navigate("/liked")}
           >
             <Heart className="mr-3 h-4 w-4" />
@@ -65,7 +80,7 @@ export function Sidebar() {
             <Button
               key={playlist}
               variant="ghost"
-              className="w-full justify-start text-muted-foreground"
+              className="w-full justify-start text-muted-foreground hover:bg-accent/30"
             >
               <Music className="mr-3 h-4 w-4" />
               {playlist}

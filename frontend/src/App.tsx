@@ -1,4 +1,4 @@
-// ✅ App.tsx (FINAL with Search + LikedSongs support)
+// src/App.tsx — FINAL BACKEND VERSION
 
 import { Routes, Route } from "react-router-dom";
 import { Header } from "./components/Header";
@@ -7,46 +7,56 @@ import { MusicCard } from "./components/MusicCard";
 import { Player } from "./components/Player";
 import { Button } from "./components/ui/button";
 import { ImageWithFallback } from "./components/figma/ImageWithFallback";
+
 import { useTracks } from "./hooks/useTracks";
-import { featuredAlbums, recentlyPlayed } from "./data/tracksData";
+import {
+  featuredAlbums,
+  recentlyPlayed,
+  tracks as staticTracks,
+} from "./data/appData";
+
 import { Track } from "./types/track";
 import LikedSongs from "./pages/LikedSongs";
-import SearchPage from "./pages/Search"; // ✅ SEARCH PAGE IMPORT
+import SearchPage from "./pages/Search";
 
 export default function App() {
   const {
-    tracks,
+    tracks,          // backend search results
+    trending,        // backend trending list (YouTube)
     currentTrack,
     loading,
     playRandomTrack,
     changeTrack,
   } = useTracks();
 
-  // Backend tracks (if available) or fallback static data
-  const recent: Track[] = tracks.length ? tracks : recentlyPlayed;
-  const albums: Track[] = featuredAlbums;
+  // PRIORITY ORDER:
+  // trending → backend search tracks → static recently played
+  const displayRecent: Track[] =
+    trending.length
+      ? trending
+      : tracks.length
+      ? tracks
+      : recentlyPlayed;
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
-      {/* HEADER */}
       <Header />
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
 
-        {/* ROUTING */}
         <main className="flex-1 overflow-y-auto pb-24">
           <Routes>
-            {/* ✅ HOME PAGE */}
+            {/* HOME PAGE */}
             <Route
               path="/"
               element={
                 <>
-                  {/* HERO SECTION */}
+                  {/* HERO */}
                   <section className="relative h-80 overflow-hidden">
                     <ImageWithFallback
                       src="https://images.unsplash.com/photo-1681149341674-45fd772fd463?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
-                      alt="Featured concert"
+                      alt="Featured"
                       className="w-full h-full object-cover"
                     />
 
@@ -57,32 +67,46 @@ export default function App() {
                       <p className="text-xl text-muted-foreground mb-4">
                         Discover new music and enjoy your favorites
                       </p>
-                      <Button size="lg" onClick={playRandomTrack} disabled={loading}>
+                      <Button
+                        size="lg"
+                        onClick={playRandomTrack}
+                        disabled={loading}
+                      >
                         {loading ? "Loading..." : "Play Random Track"}
                       </Button>
                     </div>
                   </section>
 
-                  {/* HOME SECTIONS */}
+                  {/* SECTIONS */}
                   <div className="p-8 space-y-12 max-w-7xl mx-auto">
-                    <Section title="Recently Played" items={recent} onSelect={changeTrack} />
-                    <Section title="Popular This Week" items={albums} onSelect={changeTrack} />
+                    <Section
+                      title="Recently Played"
+                      items={displayRecent}
+                      onSelect={changeTrack}
+                    />
 
-                    {/* MADE FOR YOU */}
+                    <Section
+                      title="Popular This Week"
+                      items={featuredAlbums}
+                      onSelect={changeTrack}
+                    />
+
+                    {/* Made For You */}
                     <section>
                       <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-semibold">Made For You</h2>
                         <Button variant="ghost">Show all</Button>
                       </div>
+
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {albums.slice(0, 4).map((album, index) => (
+                        {featuredAlbums.slice(0, 4).map((a, i) => (
                           <MusicCard
-                            key={index}
-                            title={`Mix ${index + 1}`}
+                            key={i}
+                            title={`Mix ${i + 1}`}
                             artist="Personalized for you"
-                            image={album.cover || album.image || ""}
+                            image={a.cover}
                             type="playlist"
-                            onClick={() => changeTrack(album)}
+                            onClick={() => changeTrack(a)}
                           />
                         ))}
                       </div>
@@ -92,35 +116,29 @@ export default function App() {
               }
             />
 
-            {/* ✅ SEARCH ROUTE */}
+            {/* SEARCH */}
             <Route path="/search" element={<SearchPage />} />
 
-            {/* ✅ LIKED SONGS ROUTE */}
+            {/* LIKED SONGS */}
             <Route
               path="/liked"
-              element={
-                <LikedSongs
-                  onPlayTrack={(track, playlist) => {
-                    changeTrack(track);
-                  }}
-                />
-              }
+              element={<LikedSongs onPlayTrack={(t) => changeTrack(t)} />}
             />
           </Routes>
         </main>
       </div>
 
-      {/* ✅ ALWAYS SHOW PLAYER */}
+      {/* PLAYER ALWAYS VISIBLE */}
       <Player
-        track={currentTrack}
-        playlist={tracks.length ? tracks : recentlyPlayed}
+        track={currentTrack || displayRecent[0] || staticTracks[0]}
+        playlist={displayRecent.length ? displayRecent : staticTracks}
         onTrackChange={changeTrack}
       />
     </div>
   );
 }
 
-/* ---------------- SECTION COMPONENT ---------------- */
+/* -------- SECTION COMPONENT -------- */
 function Section({
   title,
   items,
@@ -138,13 +156,14 @@ function Section({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <MusicCard
-            key={item.id}
+            key={item.id || index}
             title={item.title}
             artist={item.artist}
-            image={item.cover || item.image || ""}
+            image={item.cover || item.image || item.album_cover || ""}
             onClick={() => onSelect(item)}
+            track={item}
           />
         ))}
       </div>

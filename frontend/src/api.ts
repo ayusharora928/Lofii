@@ -1,14 +1,21 @@
 // src/api.ts
-const API_BASE_URL = "http://localhost:8000";
 
-export async function getTracks() {
-  const response = await fetch(`${API_BASE_URL}/tracks`);
-  if (!response.ok) throw new Error("Failed to fetch tracks");
-  return response.json();
+export const API_BASE = "http://localhost:8000";
+
+/* -------------------------------------------
+   🔍 SEARCH TRACKS (YouTube → Backend)
+-------------------------------------------- */
+export async function searchTracks(query: string) {
+  const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+  if (!res.ok) throw new Error("Search failed");
+  return await res.json();
 }
 
-export async function getRandomTrack() {
-  const response = await fetch(`${API_BASE_URL}/random-track`);
-  if (!response.ok) throw new Error("Failed to fetch random track");
-  return response.json();
+/* -------------------------------------------
+   🎵 GET STREAM URL FOR A TRACK
+-------------------------------------------- */
+export async function getStream(videoId: string) {
+  const res = await fetch(`${API_BASE}/stream/${videoId}`);
+  if (!res.ok) throw new Error("Stream lookup failed");
+  return await res.json();
 }
