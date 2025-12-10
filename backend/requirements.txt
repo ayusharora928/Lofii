@@ -1,5 +1,8 @@
-fastapi
-uvicorn
 httpx
 yt-dlp
+fastapi
+uvicorn
+python-multipart
 pydantic
+youtubesearchpython
+requests

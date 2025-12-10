@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
-from youtubesearchpython import VideosSearch
+import json
+import subprocess
 
-app = FastAPI(title="LoFiChill Universal Backend")
+app = FastAPI(title="LoFiChill Backend (Python 3.13 Compatible)")
 
-# CORS — allow everything during development
+# ------------------------------------------------------------
+# CORS
+# ------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,35 +19,50 @@ app.add_middleware(
 
 
 # ------------------------------------------------------------
-# 🔍 SEARCH SONGS (YouTube API replacement)
+# 🔍 SEARCH USING YT-DLP (works on all Python versions)
 # ------------------------------------------------------------
 @app.get("/search")
-def search_tracks(q: str):
-    """Search YouTube using a stable library (no HTML parsing)"""
+async def search_tracks(q: str):
+    """
+    Search YouTube using yt-dlp --dump-json
+    """
+    try:
+        cmd = [
+            "yt-dlp",
+            f"ytsearch10:{q}",
+            "--dump-json",       # return JSON output
+            "--skip-download"
+        ]
 
-    search = VideosSearch(q, limit=10)
-    results = search.result()["result"]
+        result = subprocess.check_output(cmd).decode("utf-8")
 
-    tracks = []
+        # yt-dlp prints multiple JSON objects line-by-line → split
+        lines = result.strip().split("\n")
+        videos = [json.loads(line) for line in lines]
 
-    for v in results:
-        tracks.append({
-            "id": v["id"],
-            "title": v["title"],
-            "artist": v.get("channel", {}).get("name", "Unknown Artist"),
-            "thumbnail": v["thumbnails"][0]["url"],
-        })
+        tracks = []
+        for v in videos:
+            tracks.append({
+                "id": v.get("id"),
+                "title": v.get("title") or "Unknown Title",
+                "artist": v.get("uploader") or "Unknown Artist",
+                "thumbnail": v.get("thumbnail"),
+            })
 
-    return tracks
+        return tracks
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ------------------------------------------------------------
-# 🎵 GET DIRECT AUDIO STREAM URL
+# 🎵 GET DIRECT STREAM URL
 # ------------------------------------------------------------
 @app.get("/stream/{video_id}")
-def get_stream(video_id: str):
-    """Return direct MP3/Opus streaming URL from YouTube"""
-
+async def get_stream(video_id: str):
+    """
+    Convert video → streaming URL
+    """
     try:
         ydl_opts = {
             "quiet": True,
@@ -58,8 +76,8 @@ def get_stream(video_id: str):
             )
 
         return {
-            "url": info["url"],
-            "title": info["title"],
+            "url": info.get("url"),
+            "title": info.get("title"),
             "artist": info.get("uploader"),
             "thumbnail": info.get("thumbnail")
         }
@@ -69,14 +87,13 @@ def get_stream(video_id: str):
 
 
 # ------------------------------------------------------------
-# 🎧 GET FULL TRACK DETAILS (search + stream)
+# FULL METADATA + STREAM (optional)
 # ------------------------------------------------------------
 @app.get("/track/{video_id}")
-def track_details(video_id: str):
-    """Return title + artist + thumbnail + audio stream"""
-    return get_stream(video_id)
+async def track_details(video_id: str):
+    return await get_stream(video_id)
 
 
 @app.get("/")
 def root():
-    return {"message": "LoFiChill backend running with YouTube music!"}
+    return {"message": "LoFiChill backend running!"}
